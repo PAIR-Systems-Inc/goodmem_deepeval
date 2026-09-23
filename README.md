@@ -1,134 +1,144 @@
 # deepeval-goodmem
 
-[GoodMem](https://goodmem.ai) integration for
-[DeepEval](https://deepeval.com).
+GoodMem retrieval for [DeepEval](https://deepeval.com).
 
-GoodMem gives AI agents retrieval-augmented generation (RAG) memory. Store
-documents in a space and GoodMem chunks, embeds, and indexes them so your
-agent can pull back the most relevant passages on any question.
-
-This package exposes the GoodMem API as a set of DeepEval-flavoured operation
-classes. Each operation has a `run(...)` method that returns a JSON string,
-making them callable from any evaluation script, test harness, or scoring
-pipeline.
-
-## Installation
+Every retrieval is a DeepEval **retriever span**, and a retrieval turns
+directly into an `LLMTestCase` with `retrieval_context` populated — which is
+what `ContextualPrecisionMetric`, `ContextualRecallMetric`,
+`ContextualRelevancyMetric` and `FaithfulnessMetric` actually read.
 
 ```bash
 pip install deepeval-goodmem
 ```
 
-For local development:
+## Retrieve and evaluate
+
+```python
+from deepeval import evaluate
+from deepeval.metrics import ContextualRelevancyMetric, ContextualRecallMetric
+from deepeval_goodmem import GoodMemRetriever, GoodMemRetrievalHealthMetric
+
+retriever = GoodMemRetriever(space_name="docs", limit=5)   # credentials from the environment
+
+result = retriever.search("how do I rotate an API key?")
+answer = my_llm(result["hits"])                            # your generation step
+
+case = retriever.to_test_case(result, actual_output=answer)
+
+evaluate([case], [
+    ContextualRelevancyMetric(),
+    ContextualRecallMetric(),
+    GoodMemRetrievalHealthMetric(),
+])
+```
+
+`search()` is decorated with `@observe(type="retriever")` and reports `top_k`
+and the embedder through `update_retriever_span`, so the call appears as a
+retriever span with its query, latency and results.
+
+If you only need the context, `retrieve()` returns the chunk text directly:
+
+```python
+context = retriever.retrieve("how do I rotate an API key?")   # list[str]
+```
+
+### What `search()` returns
+
+| Key | What it is |
+| --- | --- |
+| `hits` | `chunk_id`, `chunk_text`, `memory_id`, `space_id`, `source`, `score`, `score_kind`, `metadata` — in the server's order |
+| `score_kind` | `"vector"` or `"reranker"`. Different scales; see below |
+| `statuses` | Statuses indicating a real problem, `[]` when clean |
+| `partial` | `True` when the server reported a real problem during this retrieval, with or without hits |
+| `abstract_reply` | The server-generated summary, only when `llm_id` is set |
+| `space_ids` | Which spaces were actually searched |
+
+A retrieval that reported a problem and returned nothing is an empty `hits`
+with `partial: True` **and a warning** — never an exception, and never
+indistinguishable from "no matches".
+
+## The health metric
+
+```python
+from deepeval_goodmem import GoodMemRetrievalHealthMetric
+
+evaluate(cases, [ContextualRecallMetric(), GoodMemRetrievalHealthMetric()])
+```
+
+Every other RAG metric scores the *content* that came back, so a broken
+reranker and a thin corpus look identical: both are poor recall.
+`GoodMemRetrievalHealthMetric` reads the diagnostics `to_test_case` puts in
+`metadata["goodmem"]` and scores the retrieval itself — `1.0` clean, `0.0`
+degraded, with the server's status codes in `reason` and `score_breakdown`.
+No LLM, so it costs nothing and never flakes. A test case with no GoodMem
+metadata is skipped rather than failed.
+
+## Scores
+
+GoodMem returns two different things in the same field:
+
+| | Range observed live | Best match is |
+| --- | --- | --- |
+| Vector score | negative, e.g. `-0.57` | the **lowest** number |
+| Reranker score | can also go negative | the **highest** number |
+
+So results keep **the server's order** and are never re-sorted; `score_kind`
+says which scale you have; and `min_score` is applied client-side only when
+`reranker_id` is set. The server's `relevance_threshold` is never sent.
+
+## Filtering
+
+```python
+retriever = GoodMemRetriever(space_name="docs", metadata_filter={"category": "billing"})
+retriever.search("refunds", metadata_filter={"lang": "en"})     # AND-ed per call
+```
+
+Values are quoted for the GoodMem filter grammar (backslash escaping, verified
+against a live server; control characters refused). For anything more complex,
+pass an expression directly with `filter=...`.
+
+## Attaching to a space by name
+
+```python
+GoodMemRetriever(space_name="docs", embedder_id="…")                     # reuse or fail
+GoodMemRetriever(space_name="docs", embedder_id="…", create_space=True)  # or create it
+```
+
+Attach-by-name is idempotent reuse: an existing space whose embedder matches
+is reused; a **different** embedder is an error, because retrieving across
+mismatched embedders returns plausible-looking nonsense. An ambiguous name is
+an error too.
+
+## Credentials
+
+From `GOODMEM_BASE_URL` and `GOODMEM_API_KEY`, or as constructor keywords:
+
+```python
+GoodMemRetriever(space_name="docs", base_url="https://localhost:8080",
+                 api_key="gm_…", verify_ssl=False)
+```
+
+They are deliberately **not** model fields, so they cannot reach a
+`model_dump()`, a `repr()` or a trace payload.
+
+## Development
 
 ```bash
 pip install -e ".[dev]"
+ruff check src tests && mypy && pytest -m "not integration"
 ```
 
-## Quickstart
-
-```python
-import json
-import os
-
-os.environ["GOODMEM_BASE_URL"] = "https://localhost:8080"
-os.environ["GOODMEM_API_KEY"] = "gm_xxxxxxxxxxxxxxxxxxxxxxxx"
-os.environ["GOODMEM_VERIFY_SSL"] = "false"  # self-signed local server
-
-from deepeval_goodmem import (
-    GoodMemCreateMemory,
-    GoodMemCreateSpace,
-    GoodMemListEmbedders,
-    GoodMemRetrieveMemories,
-)
-
-embedders = json.loads(GoodMemListEmbedders().run())
-embedder_id = embedders["embedders"][0]["embedderId"]
-
-space = json.loads(
-    GoodMemCreateSpace().run(name="quickstart", embedder_id=embedder_id)
-)
-space_id = space["spaceId"]
-
-GoodMemCreateMemory().run(
-    space_id=space_id,
-    text_content="The capital of France is Paris.",
-)
-
-results = json.loads(
-    GoodMemRetrieveMemories().run(
-        query="What is the capital of France?",
-        space_ids=space_id,
-        max_results=3,
-    )
-)
-print(results)
-```
-
-Every operation's `run(...)` returns a JSON string. On success the parsed
-object includes `"success": true` and operation-specific fields. On failure
-it includes `"success": false` and an `"error"` field.
-
-The local GoodMem dev server ships with TLS even on localhost. Set
-`GOODMEM_VERIFY_SSL=false` to accept the self-signed certificate during
-development; production deployments behind a trusted certificate should
-leave it at the default of `true`.
-
-## Available operations
-
-| Operation | Description |
-|---|---|
-| `GoodMemListEmbedders` | List embedder models available on the server |
-| `GoodMemListSpaces` | List all spaces accessible to the API key |
-| `GoodMemGetSpace` | Fetch a space by ID |
-| `GoodMemCreateSpace` | Create a space (idempotent by name) |
-| `GoodMemUpdateSpace` | Update a space's name, labels, or public-read flag |
-| `GoodMemDeleteSpace` | Delete a space and all of its memories |
-| `GoodMemCreateMemory` | Store text or a file as a memory |
-| `GoodMemListMemories` | List memories in a space, with pagination and filters |
-| `GoodMemRetrieveMemories` | Semantic retrieval across one or more spaces |
-| `GoodMemGetMemory` | Fetch a memory by ID, with optional content |
-| `GoodMemDeleteMemory` | Delete a memory |
-
-### Retrieval options
-
-`GoodMemRetrieveMemories` accepts the following parameters in addition to
-`query`, `space_ids`, and `max_results`:
-
-| Parameter | Type | Description |
-|---|---|---|
-| `metadata_filter` | str | SQL-style JSONPath filter applied server-side to every space key. Example: `CAST(val('$.category') AS TEXT) = 'feat'` |
-| `wait_for_indexing` | bool | Poll for results when none come back on the first call (default `True`) |
-| `max_wait_seconds` | float | Polling budget (default `60.0`) |
-| `poll_interval` | float | Seconds between polls (default `5.0`) |
-| `reranker_id` | str | Reranker model to refine result ordering |
-| `llm_id` | str | LLM that generates a contextual abstract reply |
-| `relevance_threshold` | float | Minimum score (0-1) for inclusion |
-| `llm_temperature` | float | Creativity (0-2) for the LLM post-processor |
-| `chronological_resort` | bool | Reorder results by creation time |
-
-## Environment variables
-
-| Variable | Description |
-|---|---|
-| `GOODMEM_BASE_URL` | Base URL of the GoodMem API server |
-| `GOODMEM_API_KEY` | API key sent as `X-API-Key` |
-| `GOODMEM_VERIFY_SSL` | Set to `false` to skip TLS verification (default `true`) |
-
-When the env vars are set, every operation constructor can be called with
-no arguments.
-
-## End-to-end example
-
-[`examples/example_usage.py`](examples/example_usage.py) walks through three
-scenarios: persistent project context, a scribe and analyst pipeline, and
-metadata-driven retrieval. The answering step uses OpenAI; install with
-`pip install deepeval-goodmem[examples]` and set `OPENAI_API_KEY` before
-running.
+The offline suite replays NDJSON captured from a live GoodMem server
+(v1.0.320) through the real SDK decoders, so the wire format is never
+invented. The live suite needs a server and is skipped without one:
 
 ```bash
-python examples/example_usage.py
+GOODMEM_BASE_URL=… GOODMEM_API_KEY=… GOODMEM_EMBEDDER_ID=… \
+  pytest -m integration
 ```
+
+There is no default credential anywhere in this repository.
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE).
+MIT
