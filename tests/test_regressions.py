@@ -339,3 +339,40 @@ def test_fixtures_are_real_server_bytes():
         if "status" in e
     ]
     assert "RERANKING_FAILED" in codes
+
+
+# ------------------------------------------------ coverage gaps (2026-09-24)
+def test_an_ambiguous_space_name_is_an_error(recorder, client):
+    """GoodMem does not require space names to be unique."""
+    recorder.route(
+        "GET", "/v1/spaces",
+        _page([_space("docs", SPACE, "e1"), _space("docs", "other-id", "e1")]),
+    )
+    r = GoodMemRetriever(space_name="docs", client=client)
+    with pytest.raises(GoodMemSpaceError, match="2 spaces are named"):
+        r.search("q")
+
+
+def test_a_missing_space_is_not_created_unless_asked(recorder, client):
+    recorder.route("GET", "/v1/spaces", _page([]))
+    r = GoodMemRetriever(space_name="nope", client=client)
+    with pytest.raises(GoodMemSpaceError, match="create_space=True"):
+        r.search("q")
+    assert all(req.method == "GET" for req in recorder.requests), "no create was sent"
+
+
+def test_space_ids_searches_every_space_in_order(recorder, client):
+    r = make(recorder, client, "retrieve_vector.ndjson", space_ids=["b-space"])
+    out = r.search("q")
+    assert recorder.last_body["spaceKeys"] == [{"spaceId": SPACE}, {"spaceId": "b-space"}]
+    assert out["space_ids"] == [SPACE, "b-space"]
+
+
+def test_an_injected_client_is_not_closed_by_the_retriever(recorder, client):
+    """The connection pool and TLS settings of an injected client are the
+    caller's; a second search on the same client must still work."""
+    recorder.route("POST", RETRIEVE, ndjson_response(ndjson_events("retrieve_vector.ndjson")))
+    r = GoodMemRetriever(space_id=SPACE, client=client)
+    r.search("one")
+    r.search("two")
+    assert len(recorder.requests) == 2

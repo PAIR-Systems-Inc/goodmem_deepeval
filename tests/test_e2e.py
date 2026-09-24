@@ -217,3 +217,17 @@ def test_health_metric_fails_a_live_degraded_retrieval(live) -> None:
     assert metric.measure(case) == 0.0
     assert metric.is_successful() is False
     assert "RERANKING_FAILED" in metric.reason
+
+
+def test_a_failed_retrieval_is_empty_and_warned_live(live: Any) -> None:
+    """Contract Q4b over a real HTTP 200: a status event and zero hits."""
+    r = GoodMemRetriever(
+        space_id=live["space_id"],
+        client=live["client"],
+        reranker_id="00000000-0000-0000-0000-000000000000",
+    )
+    with pytest.warns(UserWarning, match="RERANKING_FAILED"):
+        out = r.search("canary", metadata_filter={"category": "no-such-category"})
+    assert out["hits"] == []
+    assert out["partial"] is True
+    assert {s["code"] for s in out["statuses"]} >= {"RERANKING_FAILED"}
