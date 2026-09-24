@@ -21,7 +21,7 @@ before the fix, and the offline tests replay bytes captured from it.
 - **`GoodMemRetrievalHealthMetric`** — a real `BaseMetric` that fails a case
   whose retrieval was degraded, so a broken reranker is its own failure
   instead of a mysterious drop in someone else's recall number.
-- 29 offline tests over captured server bytes and 11 live tests with verified
+- 34 offline tests over captured server bytes and 12 live tests with verified
   teardown. 0.1.0 had 0 tests in CI, and no CI.
 
 ### Fixed
