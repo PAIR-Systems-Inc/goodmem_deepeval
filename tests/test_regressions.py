@@ -376,3 +376,15 @@ def test_an_injected_client_is_not_closed_by_the_retriever(recorder, client):
     r.search("one")
     r.search("two")
     assert len(recorder.requests) == 2
+
+
+def test_a_min_score_that_removes_every_reranked_hit_says_so(recorder, client):
+    """Measured live 2026-09-24: Voyage rerank-2.5 0.27..0.93, Jina
+    jina-reranker-v3 -0.14..0.43 on the same documents. A threshold tuned
+    for one empties the other; an empty retrieval_context must not look
+    like a miss."""
+    r = make(recorder, client, "retrieve_reranked.ndjson", reranker_id="rr", min_score=0.9)
+    with pytest.warns(UserWarning, match="removed all 3 reranked hit"):
+        out = r.search("canary")
+    assert out["hits"] == []
+    assert out["partial"] is False, "the threshold, not the server, emptied it"
