@@ -120,9 +120,12 @@ an error too.
 From `GOODMEM_BASE_URL` and `GOODMEM_API_KEY`, or as constructor keywords:
 
 ```python
-GoodMemRetriever(space_name="docs", base_url="https://localhost:8080",
-                 api_key="gm_…", verify_ssl=False)
+GoodMemRetriever(space_name="docs", base_url="https://goodmem.example.com",
+                 api_key="gm_…")
 ```
+
+`verify_ssl` defaults to on and exists for a local server with a self-signed
+certificate only; no example here turns it off.
 
 They are deliberately **not** model fields, so they cannot reach a
 `model_dump()`, a `repr()` or a trace payload.
