@@ -13,3 +13,9 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 .DS_Store
+.venv/
+.venv-smoke/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+dist/
