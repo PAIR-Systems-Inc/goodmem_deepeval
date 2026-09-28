@@ -24,7 +24,7 @@ from deepeval_goodmem._spaces import GoodMemSpaceError
 from deepeval_goodmem.metrics import GoodMemRetrievalHealthMetric
 from deepeval_goodmem.retriever import GoodMemRetriever
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 __all__ = [
     "GoodMemConnection",

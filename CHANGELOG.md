@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.2.1
+
+Documentation only; no code change.
+
+### Fixed
+
+- **README: the headline example did not run.** It built the test case with
+  `to_test_case(result, actual_output=answer)` and then evaluated it with
+  `ContextualRecallMetric`, which requires `expected_output`. Executed as
+  written, `evaluate()` stopped with `MissingTestCaseParamsError: 'expected_output'
+  cannot be None for the 'Contextual Recall' metric` (both the first example
+  and the health-metric example). The example now passes `expected_output`,
+  the health-metric example imports what it uses, and the README says which
+  RAG metrics need a reference answer. Measured: 4/6 README Python blocks ran
+  before, 6/6 after.
+- README: the `search()` return table now lists the `query` key it returns.
+
+### Added
+
+- `tests/test_readme.py` executes every README Python block through the real
+  SDK over the captured-bytes transport and fails if a metric the README
+  passes to `evaluate()` lacks a test-case field it requires. 36 offline
+  tests (was 34).
+
 ## 0.2.0
 
 A rewrite. 0.1.0 shipped no DeepEval integration: it was fourteen classes

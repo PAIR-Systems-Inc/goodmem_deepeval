@@ -22,8 +22,9 @@ retriever = GoodMemRetriever(space_name="docs", limit=5)   # credentials from th
 
 result = retriever.search("how do I rotate an API key?")
 answer = my_llm(result["hits"])                            # your generation step
+expected = "…"                                             # your reference answer
 
-case = retriever.to_test_case(result, actual_output=answer)
+case = retriever.to_test_case(result, actual_output=answer, expected_output=expected)
 
 evaluate([case], [
     ContextualRelevancyMetric(),
@@ -31,6 +32,11 @@ evaluate([case], [
     GoodMemRetrievalHealthMetric(),
 ])
 ```
+
+`ContextualRecallMetric` and `ContextualPrecisionMetric` compare against a
+reference answer, so they need `expected_output`; without it DeepEval's
+`evaluate()` raises `MissingTestCaseParamsError`.
+`ContextualRelevancyMetric` and `FaithfulnessMetric` do not.
 
 `search()` is decorated with `@observe(type="retriever")` and reports `top_k`
 and the embedder through `update_retriever_span`, so the call appears as a
@@ -46,6 +52,7 @@ context = retriever.retrieve("how do I rotate an API key?")   # list[str]
 
 | Key | What it is |
 | --- | --- |
+| `query` | The query, as passed |
 | `hits` | `chunk_id`, `chunk_text`, `memory_id`, `space_id`, `source`, `score`, `score_kind`, `metadata` — in the server's order |
 | `score_kind` | `"vector"` or `"reranker"`. Different scales; see below |
 | `statuses` | Statuses indicating a real problem, `[]` when clean |
@@ -60,8 +67,11 @@ indistinguishable from "no matches".
 ## The health metric
 
 ```python
+from deepeval import evaluate
+from deepeval.metrics import ContextualRecallMetric
 from deepeval_goodmem import GoodMemRetrievalHealthMetric
 
+# cases: LLMTestCases built with retriever.to_test_case(...), as above
 evaluate(cases, [ContextualRecallMetric(), GoodMemRetrievalHealthMetric()])
 ```
 

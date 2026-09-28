@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "deepeval-goodmem"
-version = "0.2.0"
+version = "0.2.1"
 description = "GoodMem retrieval for DeepEval — a traced retriever, LLMTestCase construction, and a retrieval-health metric."
 readme = "README.md"
 requires-python = ">=3.10"
