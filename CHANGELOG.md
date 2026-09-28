@@ -24,6 +24,22 @@ Both fixes were reproduced against a live GoodMem server (v1.0.320) on
   (retrieval status contract Q4a). An unrelated status leaves reranker
   scores and the threshold as they were; a threshold that empties genuinely
   reranked hits still warns and names the observed range.
+- **Boolean and float `metadata_filter` values silently matched nothing.**
+  Every value became `text_equals(field, str(value))`, so `{"flag": True}` was
+  sent as `CAST(val('$.flag') AS TEXT) = 'True'`: live, HTTP 200 and **0
+  results** against a memory stored with `flag: true` (`{"flag": False}` the
+  same), and `{"n": 5.0}` sent as `'5.0'` missed a stored `5`, all of which
+  read as "nothing stored". `None` was sent as the text `'None'`. Values are
+  now compared as their own type, ported from langchain-goodmem's filter
+  builder: `bool` as `BOOLEAN` (`true`/`false`, checked before `int`),
+  `int`/`float` as `NUMERIC` (finite, written as plain decimals), `str` as
+  `TEXT` with the same escaping as before. `None` and any other type raise
+  `ValueError` before a request instead of being turned into text. Live,
+  `{"flag": True}`, `{"flag": False}`, `{"n": 5}`, `{"n": 5.0}` and
+  `{"flag": True, "n": 5}` now each return the one matching memory; string
+  filters (including `O'Brien`, `a\\b` and the `x' OR '1'='1` injection) send
+  the same expression as 0.2.1. Field names are checked with a full match, so
+  a trailing newline is refused.
 
 ### Tests
 
@@ -31,7 +47,15 @@ Both fixes were reproduced against a live GoodMem server (v1.0.320) on
   broken-reranker and reranked streams (reordered, or with one status added
   or removed), decoded by the real SDK. 10 fail on 0.2.1; the 5 controls
   (working reranker, unrelated statuses, threshold warning) pass on both.
-  51 offline tests (was 36).
+- `tests/test_typed_filters.py`: 36 offline tests driving `search()` through
+  the real SDK (the expression on the wire, or a refusal with nothing sent),
+  one of them checking the README's filter table against the builder.
+  23 fail on 0.2.1; the 13 controls
+  (strings and their escaping, control characters, unsafe field names, the
+  empty mapping) pass on both.
+- Two live tests: a missing reranker with `min_score=0.0` keeps its 3
+  vector hits, and boolean/number filters match. Both fail on 0.2.1.
+- 87 offline tests (was 36); 14 live tests (was 12).
 
 ## 0.2.1
 

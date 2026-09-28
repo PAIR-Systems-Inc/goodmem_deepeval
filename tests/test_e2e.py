@@ -50,9 +50,12 @@ if not (BASE_URL and API_KEY and EMBEDDER_ID):
 
 CANARY = "The DeepEval live-test canary is OTTER-52-BEACON."
 FACTS = [
-    (CANARY, {"category": "canary"}),
+    (CANARY, {"category": "canary", "flag": True, "n": 5}),
     ("DeepEval reads LLMTestCase.retrieval_context for its RAG metrics.", {"category": "deepeval"}),
-    ("A GoodMem vector score is a negative inner product.", {"category": "scores"}),
+    (
+        "A GoodMem vector score is a negative inner product.",
+        {"category": "scores", "flag": False, "n": 3},
+    ),
 ]
 
 
@@ -197,6 +200,27 @@ def test_metadata_filter_scopes_the_search(retriever) -> None:
     out = retriever.search("anything", metadata_filter={"category": "scores"})
     assert out["hits"]
     assert all(h["metadata"].get("category") == "scores" for h in out["hits"])
+
+
+def test_boolean_and_number_filters_match_live(live, retriever) -> None:
+    """0.2.1 sent {"flag": True} as CAST(... AS TEXT) = 'True': HTTP 200 and
+    no results, indistinguishable from "nothing stored"."""
+    for metadata_filter in (
+        {"flag": True},
+        {"n": 5},
+        {"n": 5.0},
+        {"flag": True, "n": 5},
+    ):
+        out = retriever.search("anything", metadata_filter=metadata_filter)
+        assert [h["memory_id"] for h in out["hits"]] == [live["canary_id"]], (
+            metadata_filter
+        )
+        assert out["partial"] is False
+    out = retriever.search("anything", metadata_filter={"flag": False})
+    assert out["hits"]
+    assert all(h["metadata"].get("flag") is False for h in out["hits"])
+    with pytest.raises(ValueError, match="Unsupported metadata filter value None"):
+        retriever.search("anything", metadata_filter={"flag": None})
 
 
 def test_attaching_by_name_refuses_a_different_embedder(live) -> None:

@@ -115,12 +115,29 @@ Calibrate `min_score` for the reranker you use; there is no default.
 
 ```python
 retriever = GoodMemRetriever(space_name="docs", metadata_filter={"category": "billing"})
-retriever.search("refunds", metadata_filter={"lang": "en"})     # AND-ed per call
+retriever.search("refunds", metadata_filter={"lang": "en", "archived": False})  # AND-ed per call
 ```
 
-Values are quoted for the GoodMem filter grammar (backslash escaping, verified
-against a live server; control characters refused). For anything more complex,
-pass an expression directly with `filter=...`.
+Each value is compared as its own type; the Python type picks the cast:
+
+| `metadata_filter` | Sent to the server |
+| --- | --- |
+| `{"category": "billing"}` | `CAST(val('$.category') AS TEXT) = 'billing'` |
+| `{"archived": False}` | `CAST(val('$.archived') AS BOOLEAN) = false` |
+| `{"year": 2026}` | `CAST(val('$.year') AS NUMERIC) = 2026` |
+| `{"score": 2.5}` | `CAST(val('$.score') AS NUMERIC) = 2.5` |
+
+Pass the type your metadata stores. Live (v1.0.320), 0.2.1 sent
+`{"flag": True}` as `AS TEXT = 'True'`, which the server accepts with HTTP 200
+and matches nothing, so a boolean filter looked like "nothing stored"; and
+`{"n": 5.0}` as `'5.0'`, which misses a stored `5`. `AS BOOLEAN` and
+`AS NUMERIC` match both. `None` and any other type (lists, dicts, bytes, NaN,
+infinity) raise `ValueError` before a request rather than being turned into
+text that silently matches nothing.
+
+Text values are quoted for the GoodMem filter grammar (backslash escaping,
+verified against a live server; control characters refused). For anything
+more complex, pass an expression directly with `filter=...`.
 
 ## Attaching to a space by name
 
@@ -155,6 +172,11 @@ They are deliberately **not** model fields, so they cannot reach a
 pip install -e ".[dev]"
 ruff check src tests examples && mypy && pytest -m "not integration"
 ```
+
+CI runs the same three on Python 3.10–3.13, then builds the sdist and wheel,
+imports the wheel in a clean virtualenv, and fails if a GoodMem API key
+(`gm_` followed by 20 or more lowercase letters or digits) is anywhere in the
+tree.
 
 The offline suite replays NDJSON captured from a live GoodMem server
 (v1.0.320) through the real SDK decoders, so the wire format is never
