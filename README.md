@@ -54,7 +54,7 @@ context = retriever.retrieve("how do I rotate an API key?")   # list[str]
 | --- | --- |
 | `query` | The query, as passed |
 | `hits` | `chunk_id`, `chunk_text`, `memory_id`, `space_id`, `source`, `score`, `score_kind`, `metadata` — in the server's order |
-| `score_kind` | `"vector"` or `"reranker"`. Different scales; see below |
+| `score_kind` | `"vector"` or `"reranker"`: what the server returned, not what was configured. Different scales; see below |
 | `statuses` | Statuses indicating a real problem, `[]` when clean |
 | `partial` | `True` when the server reported a real problem during this retrieval, with or without hits |
 | `abstract_reply` | The server-generated summary, only when `llm_id` is set |
@@ -93,8 +93,17 @@ GoodMem returns two different things in the same field:
 | Reranker score | can also go negative | the **highest** number |
 
 So results keep **the server's order** and are never re-sorted; `score_kind`
-says which scale you have; and `min_score` is applied client-side only when
-`reranker_id` is set. The server's `relevance_threshold` is never sent.
+says which scale you have; and `min_score` is applied client-side, only to
+reranker scores. The server's `relevance_threshold` is never sent.
+
+`score_kind` says what the server actually did, not what was configured. When
+`reranker_id` is set but the reranker fails, the server reports
+`RERANKING_FAILED` (and `NOT_FOUND` for a missing reranker) and still returns
+the vector-stage hits. Those hits are `score_kind: "vector"` with their raw
+vector scores, and `min_score` is not applied to them, so a reranker threshold
+cannot discard what the server returned; `partial` is `True` and `statuses`
+carries both codes. (0.2.1 labelled them `"reranker"`, and live, with a
+missing reranker, `min_score=0.0` returned none of the 3 hits the server sent.)
 
 Even with a reranker the scale is **model-dependent**: on the same documents
 Voyage `rerank-2.5` scored `0.27..0.93` and Jina `jina-reranker-v3` scored
@@ -106,12 +115,29 @@ Calibrate `min_score` for the reranker you use; there is no default.
 
 ```python
 retriever = GoodMemRetriever(space_name="docs", metadata_filter={"category": "billing"})
-retriever.search("refunds", metadata_filter={"lang": "en"})     # AND-ed per call
+retriever.search("refunds", metadata_filter={"lang": "en", "archived": False})  # AND-ed per call
 ```
 
-Values are quoted for the GoodMem filter grammar (backslash escaping, verified
-against a live server; control characters refused). For anything more complex,
-pass an expression directly with `filter=...`.
+Each value is compared as its own type; the Python type picks the cast:
+
+| `metadata_filter` | Sent to the server |
+| --- | --- |
+| `{"category": "billing"}` | `CAST(val('$.category') AS TEXT) = 'billing'` |
+| `{"archived": False}` | `CAST(val('$.archived') AS BOOLEAN) = false` |
+| `{"year": 2026}` | `CAST(val('$.year') AS NUMERIC) = 2026` |
+| `{"score": 2.5}` | `CAST(val('$.score') AS NUMERIC) = 2.5` |
+
+Pass the type your metadata stores. Live (v1.0.320), 0.2.1 sent
+`{"flag": True}` as `AS TEXT = 'True'`, which the server accepts with HTTP 200
+and matches nothing, so a boolean filter looked like "nothing stored"; and
+`{"n": 5.0}` as `'5.0'`, which misses a stored `5`. `AS BOOLEAN` and
+`AS NUMERIC` match both. `None` and any other type (lists, dicts, bytes, NaN,
+infinity) raise `ValueError` before a request rather than being turned into
+text that silently matches nothing.
+
+Text values are quoted for the GoodMem filter grammar (backslash escaping,
+verified against a live server; control characters refused). For anything
+more complex, pass an expression directly with `filter=...`.
 
 ## Attaching to a space by name
 
@@ -147,18 +173,26 @@ pip install -e ".[dev]"
 ruff check src tests examples && mypy && pytest -m "not integration"
 ```
 
+CI runs the same three on Python 3.10–3.13, then builds the sdist and wheel,
+imports the wheel in a clean virtualenv, and fails if a GoodMem API key
+(`gm_` followed by 20 or more lowercase letters or digits) is anywhere in the
+tree.
+
 The offline suite replays NDJSON captured from a live GoodMem server
 (v1.0.320) through the real SDK decoders, so the wire format is never
 invented. The live suite needs a server and is skipped without one:
 
 ```bash
 GOODMEM_BASE_URL=… GOODMEM_API_KEY=… GOODMEM_EMBEDDER_ID=… \
-  GOODMEM_RERANKER_ID=… GOODMEM_VERIFY_SSL=0 \
+  GOODMEM_RERANKER_ID=… SSL_CERT_FILE=/path/to/local-ca.pem \
   pytest -m integration
 ```
 
-`GOODMEM_RERANKER_ID` is optional — the reranker tests skip without it.
-`GOODMEM_VERIFY_SSL=0` is for a local server with a self-signed certificate.
+`GOODMEM_RERANKER_ID` is optional — the working-reranker test skips without
+it. For a local server with a self-signed certificate, point `SSL_CERT_FILE`
+at its CA so TLS verification stays on (`GOODMEM_VERIFY_SSL=0` turns it off).
+`GOODMEM_E2E_SPACE_PREFIX` names the temporary test space (default
+`deepeval-goodmem-e2e-`), so its owner is recognisable on a shared server.
 
 There is no default credential anywhere in this repository.
 
