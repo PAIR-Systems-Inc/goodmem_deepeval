@@ -18,6 +18,11 @@ from goodmem.models.retrieve_memory_event import RetrieveMemoryEvent
 # (NOT_FOUND, RERANKING_FAILED, ...). Retrieval status contract, Q1.
 _INFORMATIONAL_CODES = frozenset({"LLM_CAPABILITY_INFERRED", "FEATURE_DISABLED"})
 
+# The status the server sends when a requested reranker could not run. The
+# server then returns the vector-stage hits instead, scored as vector
+# distances rather than on the reranker's scale.
+_RERANKING_FAILED = "RERANKING_FAILED"
+
 
 def is_informational(status: GoodMemStatus) -> bool:
     """True for notices that carry no loss of results.
@@ -59,6 +64,35 @@ def classify(
     return surfaced, degraded
 
 
+def reranking_failed(events: Iterable[RetrieveMemoryEvent]) -> bool:
+    """True when the server reported that the requested reranker did not run.
+
+    ``RERANKING_FAILED`` says so directly. A ``NOT_FOUND`` naming the reranker
+    (live, v1.0.320: ``details: {"reranker_id": ...}``, message "Reranker not
+    found") means the same, even if it arrives alone. Either way the server
+    still returns the vector-stage hits, so they carry vector scores.
+
+    Pass the whole stream: a ``RERANKING_FAILED`` can follow the hits it
+    applies to. Any other status, including an unrecognized one, says
+    nothing about the reranker and leaves its scores alone.
+    """
+    for event in events:
+        status = event.status
+        if status is None:
+            continue
+        if status.code == _RERANKING_FAILED:
+            return True
+        if status.code == "NOT_FOUND":
+            details = status.details or {}
+            if (
+                "reranker_id" in details
+                or "rerankerId" in details
+                or "reranker" in (status.message or "").lower()
+            ):
+                return True
+    return False
+
+
 def hits_from_events(
     events: Iterable[RetrieveMemoryEvent],
     *,
@@ -73,6 +107,10 @@ def hits_from_events(
     Server ordering and raw scores are preserved. ``score_kind`` records where
     the score came from, because a reranker score and a vector score are not
     on the same scale and must not be compared or thresholded together.
+
+    ``reranked`` is whether the hits carry reranker scores -- what the server
+    did, not what was configured: a reranker that was requested but failed
+    (:func:`reranking_failed`) leaves vector scores.
     """
     events = list(events)
     memories = {

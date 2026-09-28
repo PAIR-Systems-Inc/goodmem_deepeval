@@ -11,7 +11,12 @@ from deepeval.tracing import observe, update_retriever_span
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from deepeval_goodmem._connection import GoodMemConnection, split_connection_kwargs
-from deepeval_goodmem._results import abstract_reply, classify, hits_from_events
+from deepeval_goodmem._results import (
+    abstract_reply,
+    classify,
+    hits_from_events,
+    reranking_failed,
+)
 from deepeval_goodmem._spaces import GoodMemSpaceError, resolve
 from deepeval_goodmem.filters import combine, from_mapping
 
@@ -50,7 +55,13 @@ class GoodMemRetriever(BaseModel):
     match is the *lowest* number -- and a reranker score is a different scale
     that also goes negative, so they are never mixed, re-sorted or compared.
     ``score_kind`` on each hit says which one you have, and ``min_score`` is
-    honoured only with a reranker configured.
+    honoured only for reranker scores.
+
+    ``score_kind`` reports what the server did, not what was configured. When
+    a configured reranker fails, the server reports ``RERANKING_FAILED`` (and
+    ``NOT_FOUND`` for a missing reranker) and still returns the vector-stage
+    hits. Those are ``score_kind="vector"``, ``min_score`` is not applied to
+    them, and the result is ``partial`` with both statuses.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -76,7 +87,10 @@ class GoodMemRetriever(BaseModel):
     reranker_id: str | None = None
     min_score: float | None = Field(
         default=None,
-        description="Only applied when reranker_id is set. See the class docstring.",
+        description=(
+            "Only applied to reranker scores: with reranker_id set and the "
+            "server not reporting that reranking failed. See the class docstring."
+        ),
     )
     filter: str | None = Field(
         default=None,
@@ -148,12 +162,17 @@ class GoodMemRetriever(BaseModel):
         nothing is an empty ``hits`` with ``partial=True`` and a warning -- it
         is never raised, and it is distinguishable from "no matches" by the
         flag. (Retrieval status contract, Q4a/Q4b.)
+
+        ``score_kind`` is ``"reranker"`` only when the hits carry reranker
+        scores. A configured reranker that the server reports as failed
+        leaves vector-scored fallback hits, which are kept, labelled
+        ``"vector"`` and not filtered by ``min_score``.
         """
         if not query or not query.strip():
             raise ValueError("query cannot be empty.")
 
         want = limit if limit is not None else self.limit
-        reranked = bool(self.reranker_id)
+        rerank_requested = bool(self.reranker_id)
         expression = self._expression(metadata_filter)
 
         update_retriever_span(embedder=self.embedder_id, top_k=want)
@@ -172,7 +191,7 @@ class GoodMemRetriever(BaseModel):
                 kwargs["space_keys"] = [
                     {"spaceId": sid, "filter": expression} for sid in targets
                 ]
-            if reranked:
+            if rerank_requested:
                 kwargs["reranker_id"] = self.reranker_id
                 kwargs["max_results"] = want
             if self.llm_id:
@@ -183,6 +202,11 @@ class GoodMemRetriever(BaseModel):
             events = list(client.memories.retrieve(**kwargs))
 
         statuses, degraded = classify(events)
+        # Decided from the response once the whole stream is in (a
+        # RERANKING_FAILED can follow the hits): a reranker that was requested
+        # but failed leaves the server's vector-stage hits, and a reranker
+        # threshold applied to those would discard what the server returned.
+        reranked = rerank_requested and not reranking_failed(events)
         hits = hits_from_events(events, reranked=reranked)
 
         if reranked and self.min_score is not None:

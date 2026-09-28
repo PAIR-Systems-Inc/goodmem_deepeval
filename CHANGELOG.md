@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.2.2
+
+Both fixes were reproduced against a live GoodMem server (v1.0.320) on
+0.2.1 and re-measured with the identical probe after the fix.
+
+### Fixed
+
+- **A failed reranker's fallback was reported as reranked, and `min_score`
+  discarded it.** With `reranker_id` set and the reranker failing, the server
+  sends `NOT_FOUND` (naming the reranker) and `RERANKING_FAILED` and still
+  returns the vector-stage hits (`stageName: "retrieve"`, raw scores
+  `-0.785, -0.577, -0.112` live). 0.2.1 decided `score_kind` from
+  configuration, so every hit was `"reranker"`, and `min_score` was applied
+  to vector distances: live, `min_score=0.0` returned **0 of the 3 hits** the
+  server sent, with a warning blaming the reranker's score range. Now the
+  response decides, once the whole stream is in: the hits are reranked only
+  if a reranker was requested and the server reported neither
+  `RERANKING_FAILED` nor a `NOT_FOUND` naming the reranker (`reranker_id` /
+  `rerankerId` in its details, or "reranker" in its message). Fallback hits
+  are `score_kind: "vector"` with their raw scores, `min_score` is not
+  applied to them, and the result stays `partial: true` with its statuses
+  (retrieval status contract Q4a). An unrelated status leaves reranker
+  scores and the threshold as they were; a threshold that empties genuinely
+  reranked hits still warns and names the observed range.
+
+### Tests
+
+- `tests/test_reranker_fallback.py`: 15 offline tests over the captured
+  broken-reranker and reranked streams (reordered, or with one status added
+  or removed), decoded by the real SDK. 10 fail on 0.2.1; the 5 controls
+  (working reranker, unrelated statuses, threshold warning) pass on both.
+  51 offline tests (was 36).
+
 ## 0.2.1
 
 Documentation only; no code change.

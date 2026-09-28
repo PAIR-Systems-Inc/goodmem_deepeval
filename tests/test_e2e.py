@@ -3,8 +3,12 @@
     GOODMEM_BASE_URL=https://localhost:8080 \
     GOODMEM_API_KEY=gm_… \
     GOODMEM_EMBEDDER_ID=… \
-    GOODMEM_VERIFY_SSL=0 \
+    SSL_CERT_FILE=/path/to/local-ca.pem \
     pytest -m integration
+
+GOODMEM_RERANKER_ID (a working reranker) and GOODMEM_E2E_SPACE_PREFIX (the
+test space's name prefix) are optional; GOODMEM_VERIFY_SSL=0 turns TLS
+verification off.
 
 There is no default credential. Everything created here is deleted in the
 fixture teardown, and the teardown asserts it is gone.
@@ -35,6 +39,8 @@ API_KEY = os.getenv("GOODMEM_API_KEY")
 EMBEDDER_ID = os.getenv("GOODMEM_EMBEDDER_ID")
 RERANKER_ID = os.getenv("GOODMEM_RERANKER_ID")
 VERIFY_SSL = os.getenv("GOODMEM_VERIFY_SSL", "1") not in ("0", "false", "False")
+# On a shared server, name the test space so its owner is recognisable.
+SPACE_PREFIX = os.getenv("GOODMEM_E2E_SPACE_PREFIX", "deepeval-goodmem-e2e-")
 
 if not (BASE_URL and API_KEY and EMBEDDER_ID):
     pytest.skip(
@@ -53,7 +59,7 @@ FACTS = [
 @pytest.fixture(scope="module")
 def live() -> Any:
     client = Goodmem(base_url=BASE_URL, api_key=API_KEY, verify=VERIFY_SSL)
-    name = f"deepeval-goodmem-e2e-{uuid.uuid4().hex[:8]}"
+    name = f"{SPACE_PREFIX}{uuid.uuid4().hex[:8]}"
     space = client.spaces.create(
         name=name,
         space_embedders=[{"embedderId": EMBEDDER_ID, "defaultRetrievalWeight": 1.0}],
@@ -138,6 +144,24 @@ def test_a_broken_reranker_is_flagged_and_keeps_its_fallback_chunks(live) -> Non
     assert out["partial"] is True
     codes = {s["code"] for s in out["statuses"]}
     assert "RERANKING_FAILED" in codes
+
+
+def test_a_broken_reranker_fallback_is_vector_and_survives_min_score(live) -> None:
+    """0.2.1 labelled the fallback "reranker" and applied min_score to vector
+    distances: live, min_score=0.0 returned 0 of the 3 hits the server sent."""
+    r = GoodMemRetriever(
+        space_id=live["space_id"],
+        client=live["client"],
+        reranker_id="00000000-0000-7000-8000-000000000000",
+        min_score=0.0,
+    )
+    out = r.search("canary")
+    assert len(out["hits"]) == 3, "min_score must not discard the fallback hits"
+    assert out["score_kind"] == "vector"
+    assert all(h["score_kind"] == "vector" for h in out["hits"])
+    assert any(h["score"] < 0 for h in out["hits"])
+    assert out["partial"] is True
+    assert {"NOT_FOUND", "RERANKING_FAILED"} <= {s["code"] for s in out["statuses"]}
 
 
 def test_a_working_reranker_is_not_reported_as_degraded(live) -> None:
