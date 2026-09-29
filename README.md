@@ -13,7 +13,13 @@ pip install goodmem-deepeval
 
 > Previously published on PyPI as `deepeval-goodmem` (last version on the
 > old name: 0.2.2). Only the distribution name changed: the import is still
-> `import deepeval_goodmem`.
+> `import deepeval_goodmem`. Both distributions ship that same package, so
+> installing both makes them overwrite each other's files — uninstall the old
+> one first:
+>
+> ```bash
+> pip uninstall -y deepeval-goodmem && pip install goodmem-deepeval
+> ```
 
 ## Retrieve and evaluate
 
