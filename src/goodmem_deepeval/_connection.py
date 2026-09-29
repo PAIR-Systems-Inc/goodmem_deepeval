@@ -17,7 +17,7 @@ from typing import Any, cast
 from goodmem import Goodmem
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
-from deepeval_goodmem._typing import GoodmemClient
+from goodmem_deepeval._typing import GoodmemClient
 
 DEFAULT_TIMEOUT = 60.0
 

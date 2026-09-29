@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from deepeval_goodmem._typing import GoodmemClient
+from goodmem_deepeval._typing import GoodmemClient
 
 # A name is not unique, so the lookup is bounded rather than unbounded.
 MAX_CANDIDATES = 200

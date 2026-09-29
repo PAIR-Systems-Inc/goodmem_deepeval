@@ -14,7 +14,7 @@ class GoodMemRetrievalHealthMetric(BaseMetric):
     Every other RAG metric scores the *content* that came back and cannot
     tell a thin corpus from a broken reranker: both look like poor recall.
     This one reads the diagnostics
-    :meth:`~deepeval_goodmem.retriever.GoodMemRetriever.to_test_case` puts in
+    :meth:`~goodmem_deepeval.retriever.GoodMemRetriever.to_test_case` puts in
     ``metadata["goodmem"]`` and scores the retrieval itself, so a run that
     silently lost a stage shows up as its own failure rather than as a
     mysterious drop in someone else's number::

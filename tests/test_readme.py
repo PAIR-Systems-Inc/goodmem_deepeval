@@ -20,7 +20,7 @@ from goodmem import Goodmem
 import httpx
 import pytest
 
-from deepeval_goodmem import _connection
+from goodmem_deepeval import _connection
 from tests.conftest import Recorder, load_json, ndjson_events, ndjson_response
 
 README = Path(__file__).resolve().parent.parent / "README.md"

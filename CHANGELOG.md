@@ -1,17 +1,13 @@
 # Changelog
 
-## 0.2.3
+## 0.3.0
 
 ### Changed
 
-- **The distribution is renamed from `deepeval-goodmem` to `goodmem-deepeval`**
-  (`pip install goodmem-deepeval`): the package moved into the PAIR Systems
-  PyPI organisation under the `goodmem-<framework>` naming used by
-  `goodmem-adk` and `goodmem-semantic-kernel`. The import package is
-  unchanged — `from deepeval_goodmem import GoodMemRetriever` keeps working.
-  The old name stays at 0.2.2. Both distributions ship `deepeval_goodmem`, so
-  installing both makes them overwrite each other's files; uninstall the old
-  one first: `pip uninstall -y deepeval-goodmem && pip install goodmem-deepeval`.
+- **Breaking:** renamed to `goodmem-deepeval` (import `goodmem_deepeval`),
+  the goodmem-<framework> naming used by goodmem-adk and
+  goodmem-semantic-kernel. Update imports from `deepeval_goodmem` to
+  `goodmem_deepeval`.
 
 ## 0.2.2
 

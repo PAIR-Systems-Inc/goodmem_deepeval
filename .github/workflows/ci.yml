@@ -59,7 +59,7 @@ jobs:
         run: |
           python -m venv .venv-smoke
           .venv-smoke/bin/pip install dist/goodmem_deepeval-*.whl
-          .venv-smoke/bin/python -c "from deepeval_goodmem import GoodMemRetriever, GoodMemRetrievalHealthMetric, __version__; print('goodmem-deepeval', __version__, 'OK')"
+          .venv-smoke/bin/python -c "from goodmem_deepeval import GoodMemRetriever, GoodMemRetrievalHealthMetric, __version__; print('goodmem-deepeval', __version__, 'OK')"
 
   secrets:
     name: no GoodMem keys in the tree

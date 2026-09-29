@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "goodmem-deepeval"
-version = "0.2.3"
+version = "0.3.0"
 description = "GoodMem retrieval for DeepEval — a traced retriever, LLMTestCase construction, and a retrieval-health metric."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -46,10 +46,10 @@ source = "https://github.com/PAIR-Systems-Inc/goodmem_deepeval"
 issues = "https://github.com/PAIR-Systems-Inc/goodmem_deepeval/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/deepeval_goodmem"]
+packages = ["src/goodmem_deepeval"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/deepeval_goodmem", "tests", "README.md", "CHANGELOG.md", "LICENSE", "pyproject.toml"]
+include = ["src/goodmem_deepeval", "tests", "README.md", "CHANGELOG.md", "LICENSE", "pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -74,7 +74,7 @@ force-sort-within-sections = true
 
 [tool.mypy]
 python_version = "3.10"
-packages = ["deepeval_goodmem"]
+packages = ["goodmem_deepeval"]
 mypy_path = "src"
 warn_unused_ignores = true
 warn_redundant_casts = true
