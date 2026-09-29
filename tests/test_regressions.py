@@ -1,4 +1,4 @@
-"""Every test here fails against deepeval-goodmem 0.1.0.
+"""Every test here fails against the 0.1.0 release.
 
 The fixtures are bytes a live server (v1.0.320) actually sent.
 """
@@ -12,7 +12,7 @@ from deepeval.test_case import LLMTestCase
 import httpx
 import pytest
 
-from deepeval_goodmem import (
+from goodmem_deepeval import (
     GoodMemRetrievalHealthMetric,
     GoodMemRetriever,
     GoodMemSpaceError,

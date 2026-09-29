@@ -10,15 +10,15 @@ from deepeval.test_case import LLMTestCase
 from deepeval.tracing import observe, update_retriever_span
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
-from deepeval_goodmem._connection import GoodMemConnection, split_connection_kwargs
-from deepeval_goodmem._results import (
+from goodmem_deepeval._connection import GoodMemConnection, split_connection_kwargs
+from goodmem_deepeval._results import (
     abstract_reply,
     classify,
     hits_from_events,
     reranking_failed,
 )
-from deepeval_goodmem._spaces import GoodMemSpaceError, resolve
-from deepeval_goodmem.filters import combine, from_mapping
+from goodmem_deepeval._spaces import GoodMemSpaceError, resolve
+from goodmem_deepeval.filters import combine, from_mapping
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -37,7 +37,7 @@ class GoodMemRetriever(BaseModel):
 
         from deepeval import evaluate
         from deepeval.metrics import ContextualRelevancyMetric
-        from deepeval_goodmem import GoodMemRetriever
+        from goodmem_deepeval import GoodMemRetriever
 
         retriever = GoodMemRetriever(space_name="docs", limit=5)
         result = retriever.search("how do I rotate an API key?")
@@ -290,7 +290,7 @@ class GoodMemRetriever(BaseModel):
 
         The retrieval's diagnostics travel in ``metadata["goodmem"]`` so a
         metric can see them -- see
-        :class:`~deepeval_goodmem.metrics.GoodMemRetrievalHealthMetric`.
+        :class:`~goodmem_deepeval.metrics.GoodMemRetrievalHealthMetric`.
         Scoring an evaluation without knowing the retrieval was degraded is
         how a broken reranker turns into a mysterious drop in recall.
         """

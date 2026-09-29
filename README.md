@@ -1,4 +1,4 @@
-# deepeval-goodmem
+# goodmem-deepeval
 
 GoodMem retrieval for [DeepEval](https://deepeval.com).
 
@@ -8,7 +8,7 @@ what `ContextualPrecisionMetric`, `ContextualRecallMetric`,
 `ContextualRelevancyMetric` and `FaithfulnessMetric` actually read.
 
 ```bash
-pip install deepeval-goodmem
+pip install goodmem-deepeval
 ```
 
 ## Retrieve and evaluate
@@ -16,7 +16,7 @@ pip install deepeval-goodmem
 ```python
 from deepeval import evaluate
 from deepeval.metrics import ContextualRelevancyMetric, ContextualRecallMetric
-from deepeval_goodmem import GoodMemRetriever, GoodMemRetrievalHealthMetric
+from goodmem_deepeval import GoodMemRetriever, GoodMemRetrievalHealthMetric
 
 retriever = GoodMemRetriever(space_name="docs", limit=5)   # credentials from the environment
 
@@ -69,7 +69,7 @@ indistinguishable from "no matches".
 ```python
 from deepeval import evaluate
 from deepeval.metrics import ContextualRecallMetric
-from deepeval_goodmem import GoodMemRetrievalHealthMetric
+from goodmem_deepeval import GoodMemRetrievalHealthMetric
 
 # cases: LLMTestCases built with retriever.to_test_case(...), as above
 evaluate(cases, [ContextualRecallMetric(), GoodMemRetrievalHealthMetric()])
@@ -192,7 +192,7 @@ GOODMEM_BASE_URL=… GOODMEM_API_KEY=… GOODMEM_EMBEDDER_ID=… \
 it. For a local server with a self-signed certificate, point `SSL_CERT_FILE`
 at its CA so TLS verification stays on (`GOODMEM_VERIFY_SSL=0` turns it off).
 `GOODMEM_E2E_SPACE_PREFIX` names the temporary test space (default
-`deepeval-goodmem-e2e-`), so its owner is recognisable on a shared server.
+`goodmem-deepeval-e2e-`), so its owner is recognisable on a shared server.
 
 There is no default credential anywhere in this repository.
 

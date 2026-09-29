@@ -25,12 +25,12 @@ from deepeval.test_case import LLMTestCase
 from goodmem import Goodmem
 import pytest
 
-from deepeval_goodmem import (
+from goodmem_deepeval import (
     GoodMemRetrievalHealthMetric,
     GoodMemRetriever,
     GoodMemSpaceError,
 )
-from deepeval_goodmem._spaces import find_by_name
+from goodmem_deepeval._spaces import find_by_name
 
 pytestmark = pytest.mark.integration
 
@@ -40,7 +40,7 @@ EMBEDDER_ID = os.getenv("GOODMEM_EMBEDDER_ID")
 RERANKER_ID = os.getenv("GOODMEM_RERANKER_ID")
 VERIFY_SSL = os.getenv("GOODMEM_VERIFY_SSL", "1") not in ("0", "false", "False")
 # On a shared server, name the test space so its owner is recognisable.
-SPACE_PREFIX = os.getenv("GOODMEM_E2E_SPACE_PREFIX", "deepeval-goodmem-e2e-")
+SPACE_PREFIX = os.getenv("GOODMEM_E2E_SPACE_PREFIX", "goodmem-deepeval-e2e-")
 
 if not (BASE_URL and API_KEY and EMBEDDER_ID):
     pytest.skip(

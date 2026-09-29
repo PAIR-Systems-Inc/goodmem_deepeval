@@ -18,7 +18,7 @@ from typing import Any
 
 import pytest
 
-from deepeval_goodmem import GoodMemRetriever, filters
+from goodmem_deepeval import GoodMemRetriever, filters
 from tests.conftest import Recorder, ndjson_events, ndjson_response
 
 SPACE = "01a0cfc4-59e7-719e-a126-7297caeadb45"

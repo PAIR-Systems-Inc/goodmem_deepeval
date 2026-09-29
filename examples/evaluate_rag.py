@@ -16,7 +16,7 @@ import os
 from deepeval import evaluate
 from deepeval.metrics import ContextualRelevancyMetric
 
-from deepeval_goodmem import GoodMemRetrievalHealthMetric, GoodMemRetriever
+from goodmem_deepeval import GoodMemRetrievalHealthMetric, GoodMemRetriever
 
 SPACE_ID = os.environ["GOODMEM_SPACE_ID"]
 QUESTION = os.getenv("QUESTION", "what is this corpus about?")

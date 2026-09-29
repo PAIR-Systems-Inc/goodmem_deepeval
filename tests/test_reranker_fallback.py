@@ -18,7 +18,7 @@ import warnings
 
 import pytest
 
-from deepeval_goodmem import GoodMemRetrievalHealthMetric, GoodMemRetriever
+from goodmem_deepeval import GoodMemRetrievalHealthMetric, GoodMemRetriever
 from tests.conftest import Recorder, ndjson_events, ndjson_response
 
 SPACE = "01a0cfc4-59e7-719e-a126-7297caeadb45"

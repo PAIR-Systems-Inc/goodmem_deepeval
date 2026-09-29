@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+### Changed
+
+- **Breaking:** renamed to `goodmem-deepeval` (import `goodmem_deepeval`),
+  the goodmem-<framework> naming used by goodmem-adk and
+  goodmem-semantic-kernel. Update imports from `deepeval_goodmem` to
+  `goodmem_deepeval`.
+
 ## 0.2.2
 
 Both fixes were reproduced against a live GoodMem server (v1.0.320) on
