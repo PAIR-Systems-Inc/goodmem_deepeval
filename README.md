@@ -1,4 +1,4 @@
-# deepeval-goodmem
+# goodmem-deepeval
 
 GoodMem retrieval for [DeepEval](https://deepeval.com).
 
@@ -8,8 +8,12 @@ what `ContextualPrecisionMetric`, `ContextualRecallMetric`,
 `ContextualRelevancyMetric` and `FaithfulnessMetric` actually read.
 
 ```bash
-pip install deepeval-goodmem
+pip install goodmem-deepeval
 ```
+
+> Previously published on PyPI as `deepeval-goodmem` (last version on the
+> old name: 0.2.2). Only the distribution name changed: the import is still
+> `import deepeval_goodmem`.
 
 ## Retrieve and evaluate
 
